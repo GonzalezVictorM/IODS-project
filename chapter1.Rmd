@@ -3,6 +3,13 @@
 
 *Write a short description about the course and add a link to your GitHub repository here. This is an R Markdown (.Rmd) file so you should use R Markdown syntax.*
 
+# My answer
+
+Well, I had never coded in my life before last *January*, so I am still a bit of a **"noob"** in these type of tasks. Regardless, I am a fat learner. I have been able to design some robust pipelines for data analysis, but I have maintained them locally. It is very exciting for me to start learning to use GitHub and all of its applications. The description of the course got me really excited since I am always copy/pasting code and referencing the source, and I think these abilities (those shown in the course) will enable me to be more agile in my coding.  
+Here is my forked repository:  
+<https://github.com/GonzalezVictorM/IODS-project>
+or [here](https://github.com/GonzalezVictorM/IODS-project)
+
 ```{r}
 # This is a so-called "R chunk" where you can write R code.
 
