@@ -43,7 +43,7 @@ lrn14$stra <- lrn14 %>%
   select(one_of(strategic_questions)) %>%
   rowMeans
 
-# Define and slect the columns to keep
+# Define and select the columns to keep
 
 keep_columns <- c("gender","Age","attitude", "deep", "stra", "surf", "Points")
 
@@ -73,11 +73,4 @@ write.csv(lrn14,"learning2014.csv", row.names = F)
 # Checking that it reads.
 
 learning2014_test <- read.table("learning2014.csv", header = T, sep = ",")
-
-
-
-
-
-
-
 

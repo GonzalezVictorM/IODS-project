@@ -8,6 +8,194 @@
 
 ```{r}
 date()
+
 ```
 
 Here we go again...
+
+Remember! Set your working directory and load your libraries.
+
+```{r setup, message=FALSE}
+
+knitr::opts_knit$set(root.dir ="C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
+
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(hrbrthemes)
+library(janitor)
+
+
+```
+
+The data we will be working on comes from international survey of Approaches to Learning, made possible by Teachers' Academy funding for KV in 2013-2015. 
+
+The data shows the learning approaches in surface, deep and strategic learning of the subjects including their gender, age and points obtained. This data has been pre-processed for analysis by consolidating 60 variables into 7 of importance. As well, from 183 observations, 166 were selected as valuable by filtering Points > 0.
+
+First, we read the data and explore the dimensions, structure and head.
+
+```{r}
+
+learning2014 <- read.table("learning2014.csv", header = T, sep = ",")
+
+dim(learning2014)
+
+str(learning2014)
+
+head(learning2014)
+
+
+```
+
+As we can observe, the data contains 166 observation of 7 variables as expected. The columns included are *gender*, *age*, *attitude*, *deep*, *strategic*, *surface*, and *points*. Looking at the head, we confirm the organization of the table matches the dimensions and structure.
+
+Once we understand the structure of our data, we can move to the analysis. The goal is to understand the effect that the different learning variables have over the *points* in the examination. This can be aided by observing if gender or age have an effect over the results.
+
+Our first step is to do Exploratory Data Analysis using scatter plots, boxplots, and histograms as well as descriptive statistics such as correlation coefficients, mean and variance. Thankfully, ggpairs consolidates most of that information in a single figure with the following code.
+
+```{r}
+
+ggpairs(learning2014, mapping = aes(col = gender, alpha = 0.3), lower = list(combo = wrap("facethist", bins = 20)))
+
+```
+
+But, what should we focus on? 
+
+We can start by observing the *age* and *gender* distributions that are described in the first and second columns. From there, we can conclude that:
+
+- There are almost twice more female than male subjects.  
+- At first sight, neither gender nor age seem to cause a big effect over the learning types.  
+- The age distribution is similar for both genders.  
+- There is a strong negative correlation between surface learning against attitude and deep learning in male subjects.  
+
+Additionally, I personally prefer to look at violin plots instead of boxplots due to violin plots providing also the density of the data. (The explanation to this plot can be found [here](https://www.r-graph-gallery.com/violin_and_boxplot_ggplot2.html)).
+
+```{r}
+# Narrow the data for Learning type scores of Female subjects
+female_lt <- learning2014 %>%
+  filter(gender == "F") %>%
+  .[,c(3:6)] %>%
+  gather(key="LearningType", value="Score") %>%
+  mutate(gender = "F")
+
+# Narrow the data for Learning type scores of Male subjects
+male_lt <- learning2014 %>%
+  filter(gender == "M") %>%
+  .[,c(3:6)] %>%
+  gather(key="LearningType", value="Score") %>%
+  mutate(gender = "M")
+
+# Bind female and male data
+both_lt <- rbind(female_lt,male_lt)
+
+# Print the data
+both_lt %>%
+  mutate(LearningStyle = paste0(LearningType, "\n", gender)) %>%
+  ggplot(aes(x = LearningStyle, y = Score, fill = gender)) +
+    geom_violin(width = 1, alpha = 0.5) +
+    geom_boxplot(width = 0.1, alpha = 0.2)
+
+```
+
+This plot helps us confirm that there are no uneven densities in the different genders and learning types, except maybe on the attitude.
+
+Lastly, we can look at the mean and standard deviation of the scores separated by gender in the form of a table. In the following table, you can notice the similarities between the genders.
+
+```{r}
+
+learning2014 %>%
+  group_by(gender) %>%
+  summarise(n=n(),
+            attitudeMean = mean(attitude),
+            attitudeSD = sd(attitude),
+            deepMean = mean(deep),
+            deepSD = sd(deep),
+            StraMean = mean(stra),
+            StraSD = sd(stra),
+            surfMean = mean(surf),
+            surfSD = sd(surf),
+            pointsMean = mean(points),
+            pointsSD = sd(points)) %>% # The summarise function gives you the statistics that you want.
+  t %>% as.data.frame %>%
+  row_to_names(row_number = 1)
+
+```
+
+Once we observe the effects of *gender* and *age*, we continue to evaluate the correlation between the learning types and the points of the examination. This can be done from the figure above or by plotting each scatter plot with their linear models separately. I always like to *double click* into each correlation, so here is a code for that.
+
+```{r}
+
+# Attitude vs points
+cor <- signif(cor(learning2014$attitude,learning2014$points),2) #calculate the correlation between the two variables
+ggplot(learning2014, aes(x = attitude, y = points, col = gender)) + # Plot the variables stratified by gender
+  geom_point() +
+  geom_smooth(method ="lm", formula = 'y ~ x') + # Include the linear model
+  ggtitle(paste("Comparison of attitude and points by gender. Correlation = ", cor)) # Create a title including the correlation coefficient
+
+# Deep vs points
+cor <- signif(cor(learning2014$deep,learning2014$points),2)
+ggplot(learning2014, aes(x = deep, y = points, col = gender)) +
+  geom_point() +
+  geom_smooth(method ="lm", formula = 'y ~ x') +
+  ggtitle(paste("Comparison of deep and points by gender. Correlation = ", cor))
+
+# Strategic vs points
+cor <- signif(cor(learning2014$stra,learning2014$points),2)
+ggplot(learning2014, aes(x = stra, y = points, col = gender)) +
+  geom_point() +
+  geom_smooth(method ="lm", formula = 'y ~ x') +
+  ggtitle(paste("Comparison of strategic and points by gender. Correlation = ", cor))
+
+# Surface vs points
+cor <- signif(cor(learning2014$surf,learning2014$points),2)
+ggplot(learning2014, aes(x = surf, y = points, col = gender)) +
+  geom_point() +
+  geom_smooth(method ="lm", formula = 'y ~ x') +
+  ggtitle(paste("Comparison of surf and points by gender. Correlation = ", cor))
+
+```
+
+From these plots we can conclude:
+
+- There is no significant correlation between *points* and *deep* learning for either male or female subjects.  
+- There is a significant correlation (alpha = 0.3) between *points* and *attitude* for both male and female subjects.  
+- Even when not significant (alpha = 0.3), *strategic* and *surface* learning should be evaluated by multiple linear regression analysis.  
+
+We start by including the three variables of interest into the model and looking at the ANOVA presented by the **summary()** function.
+
+```{r}
+
+my_model <- lm(points ~ attitude + stra + surf, data = learning2014) # Create the model
+
+summary(my_model) # Print the summary of results
+
+```
+
+
+
+```{r}
+
+my_model <- lm(points ~ attitude + stra, data = learning2014)
+
+summary(my_model)
+
+```
+
+
+```{r}
+
+my_model <- lm(points ~ attitude, data = learning2014)
+
+summary(my_model)
+
+```
+
+
+
+```{r}
+
+par(mfrow = c(2,2))
+plot(my_model, which = c(1,2,5))
+
+```
+
