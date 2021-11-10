@@ -17,4 +17,3 @@ date()
 
 ```
 The text continues here.
-

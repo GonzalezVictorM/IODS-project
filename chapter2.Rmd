@@ -1,4 +1,4 @@
-# Insert chapter 2 title here
+# Data wrangling and analysis
 
 *Describe the work you have done this week and summarize your learning.*
 
@@ -30,7 +30,7 @@ library(janitor)
 
 The data we will be working on comes from international survey of Approaches to Learning, made possible by Teachers' Academy funding for KV in 2013-2015. 
 
-The data shows the learning approaches in surface, deep and strategic learning of the subjects including their gender, age and points obtained. This data has been pre-processed for analysis by consolidating 60 variables into 7 of importance. As well, from 183 observations, 166 were selected as valuable by filtering Points > 0.
+The data shows the learning approaches in attitude, surface, deep and strategic learning of the subjects including their gender, age and points obtained. This data has been pre-processed for analysis by consolidating 60 variables into 7 of importance. As well, from 183 observations, 166 were selected as valuable by filtering Points > 0.
 
 First, we read the data and explore the dimensions, structure and head.
 
@@ -47,11 +47,11 @@ head(learning2014)
 
 ```
 
-As we can observe, the data contains 166 observation of 7 variables as expected. The columns included are *gender*, *age*, *attitude*, *deep*, *strategic*, *surface*, and *points*. Looking at the head, we confirm the organization of the table matches the dimensions and structure.
+As we can observe, the data contains 166 observation of 7 variables as expected. The columns included are **gender**, **age**, **attitude**, **deep**, **strategic**, **surface**, and **points**. Looking at the head, we confirm the organization of the table matches the dimensions and structure.
 
-Once we understand the structure of our data, we can move to the analysis. The goal is to understand the effect that the different learning variables have over the *points* in the examination. This can be aided by observing if gender or age have an effect over the results.
+Once we understand the structure of our data, we can move to the analysis. The goal is to understand the effect that the different learning variables have over the **points** in the examination. This can be aided by observing if gender or age have an effect over the results.
 
-Our first step is to do Exploratory Data Analysis using scatter plots, boxplots, and histograms as well as descriptive statistics such as correlation coefficients, mean and variance. Thankfully, ggpairs consolidates most of that information in a single figure with the following code.
+Our first step is to do Exploratory Data Analysis using scatter plots, box plots, and histograms as well as descriptive statistics such as correlation coefficients, mean and variance. Thankfully, ggpairs consolidates most of that information in a single figure with the following code.
 
 ```{r}
 
@@ -61,7 +61,7 @@ ggpairs(learning2014, mapping = aes(col = gender, alpha = 0.3), lower = list(com
 
 But, what should we focus on? 
 
-We can start by observing the *age* and *gender* distributions that are described in the first and second columns. From there, we can conclude that:
+We can start by observing the **age** and **gender** distributions that are described in the first and second columns. From there, we can conclude that:
 
 - There are almost twice more female than male subjects.  
 - At first sight, neither gender nor age seem to cause a big effect over the learning types.  
@@ -97,9 +97,9 @@ both_lt %>%
 
 ```
 
-This plot helps us confirm that there are no uneven densities in the different genders and learning types, except maybe on the attitude.
+This plot helps us confirm that there are no uneven densities in the different genders and learning typessupporting the normality of each variable. Still we can see outliers in the lower tail of **attitude** M, **deep** F, and **deep** M. We will keep this in mind when we move to the diagnostic plots. 
 
-Lastly, we can look at the mean and standard deviation of the scores separated by gender in the form of a table. In the following table, you can notice the similarities between the genders.
+Lastly, we can look at the mean and standard deviation of the scores separated by gender in the form of a table. In the following table, you can notice the similarities between the genders. 
 
 ```{r}
 
@@ -120,8 +120,9 @@ learning2014 %>%
   row_to_names(row_number = 1)
 
 ```
+The box plot, the violin plot and the table have the same goal, to provide descriptive statistics for us to identify unusual constructs in our data such as outliers or non-Normal distribution of our results. This last one is particularly important since some modelling strategies assume normality in the data.
 
-Once we observe the effects of *gender* and *age*, we continue to evaluate the correlation between the learning types and the points of the examination. This can be done from the figure above or by plotting each scatter plot with their linear models separately. I always like to *double click* into each correlation, so here is a code for that.
+Once we observe the effects of **gender** and **age**, we can continue to evaluate the correlation between the learning types and the points of the examination. This can be done from the figure above or by plotting each scatter plot with their linear models separately. I always like to *double click* into each correlation, so here is a code for that.
 
 ```{r}
 
@@ -157,11 +158,11 @@ ggplot(learning2014, aes(x = surf, y = points, col = gender)) +
 
 From these plots we can conclude:
 
-- There is no significant correlation between *points* and *deep* learning for either male or female subjects.  
-- There is a significant correlation (alpha = 0.3) between *points* and *attitude* for both male and female subjects.  
-- Even when not significant (alpha = 0.3), *strategic* and *surface* learning should be evaluated by multiple linear regression analysis.  
+- There is no significant correlation between **points** and **deep** learning for either male or female subjects.
+- There is a higher correlation between **points** and **attitude** than any other of the learning types for both male and female subjects.  
+- Even when not as big as correlation between **points** and **attitude**, **strategic** and *surface** learning should be evaluated by multiple linear regression analysis to be excluded.  
 
-We start by including the three variables of interest into the model and looking at the ANOVA presented by the **summary()** function.
+We start by including the three variables of interest into the multiple linear model and looking at the ANOVA presented by the *summary()* function.
 
 ```{r}
 
@@ -171,31 +172,57 @@ summary(my_model) # Print the summary of results
 
 ```
 
+First thing that jumps to view is the t statistic and its associated p-values. Both the intercept and the **attitude** coefficient give significant values (<0.05), while the rest remain non-significant. The p-value of the t statistic tells us the probability that the variation in the target variable being explained by the explanatory variable is happening by chance (due to standard error). When this probability is under our significance level, usually 0.05, we consider that the coefficient of our explanatory variable significantly explains the variation in the target variable. Therefore, we tentatively conclude that at least the **attitude** has a significant relationship with **point**.
+
+Then, we observe the F-statistic and its associated p-value. The F-statistic tests the regression as a whole, which avoids the problems of p-values in multiple testing (which I think will be covered later in the course). Therefore, we also expect it to have a significant (<0.05) value, which it does! This means that at least one of the explanatory variables is causing this model to explain the variation in the target variable better than the Null distribution (all coefficients equal to zero).
+
+Lastly, we look at the multiple R-squared. This tells us how much of the variation in our target variable is explained by the model instead of the error. We can see that 20.7% of the variation is explained by our explanatory variables. This is low, but we still have work to do.
+
+When working with multiple linear regressions, you want to remove/add one explanatory variable at a time. Here we will take away the highest p-value of the t statistic since this tells us it is the explanatory variable that least explains our target variable's variation. The chosen one is ... **surface**.
+
+We will now run the model again.
 
 
 ```{r}
 
-my_model <- lm(points ~ attitude + stra, data = learning2014)
+my_model2 <- lm(points ~ attitude + stra, data = learning2014)
 
-summary(my_model)
+summary(my_model2)
 
 ```
 
+We can first see that all the t statistic associated p-values radically decreased. Still, **strategic** remains above the typical threshold of 0.05. This mean there is more than a 5% probability that the variation explained by that coefficient could be happening by chance. We might have to remove it but let us look at the other statistical descriptors first.
+
+The F-statistic increased and its value decreased. This tells us the this model is better at explaining the variation of our target variable then the last one. 
+
+Lastly, the the multiple R-squared lightly increased; which tells us that the model now explains 21% of the variation in the target variable.
+
+Even with the improved results, I wanna test what happens if we remove our highest t value associated p-value explanatory statistic to evaluate is the model works better without it.
 
 ```{r}
 
-my_model <- lm(points ~ attitude, data = learning2014)
+my_model3 <- lm(points ~ attitude, data = learning2014)
 
-summary(my_model)
+summary(my_model3)
 
 ```
 
+The t statistic associated p-value, F statistic associated p-value did not significantly change (less than one order of magnitude). Additionally, the multiple R-squared got worse. Due to this I will keep the second model as our best chance of explaining the data.
 
+In our selected model, Model2 (*points ~ attitude + strategic*), we have a 3.4658 coefficient for **attitude** and a 0.9137 coefficient for **strategic**. This means that every 1 unit increase in the **attitude** variable will represent 3.5 unit increase in **points**, while every 1 unit increase in the **strategic** variable will represent 0.9 unit increase in **points**.
+
+To study our selected model, we will generate diagnostic plots. Here we use plots that visually represents the relationships of the residuals (difference between observed and fitted values) in the model. This will help us validate the assumptions made by the model.
 
 ```{r}
 
 par(mfrow = c(2,2))
-plot(my_model, which = c(1,2,5))
+plot(my_model2, which = c(1,2,5))
 
 ```
+
+On the first plot we have the Residuals vs the Fitted values. This plot related the residuals (error) with the calculated values for the target variable. As we can observe in the plot, the variability of the results appears to remain constant regardless of the size of the fitted values and there is no clear pattern. It confirms the assumption that the size of the errors does not depend on the explanatory variable.
+
+The second plot is the Normal qq-plot. This plot aid in checking for symmetry and normality of the error term in the regression. We see that most of the values fall on the identity line, but both the lower and upper tails of the data are skewed. this makes ud doubt the normality assumption of the errors in the model.
+
+Lastly, we have the residuals vs leverage plot. The leverage plot helps us observe the influence of specific points in the data. We can see that there is no clear point with an increased impact over the model.
 
