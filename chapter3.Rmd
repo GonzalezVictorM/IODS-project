@@ -1,0 +1,431 @@
+## Chapter 3: Logistic Regression
+
+```{r}
+date()
+```
+
+Here we go again...
+
+Remember! Set your working directory and load your libraries.
+
+```{r setup3, message=FALSE}
+
+knitr::opts_knit$set(root.dir ="C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
+
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(ggpubr)
+library(boot)
+
+```
+
+We read the data.
+
+```{r}
+
+pormath <- read.csv("pormath.csv", header = T, sep = ",")
+
+```
+
+The data comes from P. Cortez and A. Silva. Using Data Mining to Predict Secondary School Student Performance. In A. Brito and J. Teixeira Eds., Proceedings of 5th FUture BUsiness TEChnology Conference (FUBUTEC 2008) pp. 5-12, Porto, Portugal, April, 2008, EUROSIS, ISBN 978-9077381-39-7. The data explores the attributes of student lives and their effect on their academic performance in math and Portuguese classes. For more information on the data set, visit this [link](https://archive.ics.uci.edu/ml/datasets/Student+Performance).
+
+For this analysis, we sill be focusing on the alcohol use of the students and the effect that various attributes might have on it.
+
+We first explore the dimensions and structure.
+
+```{r}
+
+dim(pormath)
+
+str(pormath)
+
+```
+
+Since we are exploring the alcohol use, we will select the variables **high_use** and **alc_use**. The variable **high_use** marks students that consume alcohol on a frequency above 2 (numeric: from 1 - very low to 5 - very high) during the whole week while **alc_use** actual value (numeric: from 1 - very low to 5 - very high).
+Once we have our target variables, we select the effect variables that we wish to study. I am interested in finding out if **age**, **health**, or the family situation affect the alcohol consumption. Therefore, I will select **age** (numeric: from 15 to 22), **health** (numeric: from 1 - very bad to 5 - very good), **famrel** (numeric: from 1 - very bad to 5 - excellent), and **famsup** (binary: yes or no). Additionally, it is always interesting to take a look at the influence of gender, so I will be including **sex** (binary: 'F' - female or 'M' - male).
+
+My hypothesis are:
+
+ - Due to the young **age** of the students, health will not show a significant relationship with **high_use**.
+ - Both **famrel** and **famsup** will have an effect in alcohol consumption. I expect that the better the family situation, the least consumption.
+ - **Age** will have a strong effect over **high_use**, simply due to acquisitive power and opportunity.
+
+The three formats for the data shown below will allow us to create different types of graphs as it will be seen in the rest of the report.
+
+```{r}
+
+## Select the columns as they are
+pormath_subset <- pormath %>% 
+  select(sex, high_use, alc_use, age, health, famrel, famsup)
+
+## Turn sex, health, famrel, and famsup into factors
+pormath_subset_fct <- pormath %>% 
+  select(sex, high_use, alc_use, age, health, famrel, famsup) %>%
+  mutate(across(c(sex, health, famrel, famsup), factor))
+
+## Turn health, famrel, and famsup into numeric values
+pormath_subset_nmr <- pormath_subset_fct %>%
+  mutate(across(c(health, famrel, famsup), as.numeric))
+
+```
+
+As a first look, we can explore our variables numerically. We can do this both as numeric variables:
+
+```{r}
+
+pormath_subset_nmr %>%
+  summary
+
+```
+
+or as factors and their frequency:
+
+```{r}
+
+pormath_subset_fct %>%
+  summary
+
+```
+
+We can observe the following:
+
+ - The number of male and females is quite similar.
+ - More than twice as much students do not have **high use** of alcohol compared to those who do.
+ - 75% of the students have a 4 or 5 **family relationship**
+ - Almost twice as much students have **family support** compared to those who don't.
+
+Now we look at the graphical representation separated by **high_use**:
+
+```{r}
+
+pormath_subset %>%
+  select(-sex) %>% # remove sex
+  ggpairs(mapping = aes(col = high_use, alpha = 0.3), 
+          lower = list(combo = wrap("facethist", bins = 20)))
+
+```
+
+and **sex**:
+
+```{r}
+
+pormath_subset %>%
+  select(-high_use) %>% # remove high_use
+  ggpairs(mapping = aes(col = sex, alpha = 0.3), 
+          lower = list(combo = wrap("facethist", bins = 20)))
+
+```
+
+Immediately we can notice that:
+
+ - **alc_use** has a strong correlation to **age** and **famrel** but mostly on male students.
+ - **health** has a strong correlation **famrel** but only on male students.
+ 
+We can now look at the means and std deviations of the data by cross-tabulation:
+
+```{r}
+
+pormath_subset_nmr %>%
+  group_by(high_use, sex) %>%
+  summarise(
+    AvgAge = mean(age),
+    sdAge = sd(age),
+    AvgHealth = mean(health),
+    sdHealth= sd(health),
+    AvgFamRel = mean(famrel),
+    sdFamRel = sd(famrel),
+    AvgFamSup = mean(famsup),
+    sdFamSup = sd(famsup))
+
+```
+
+But this is hard to read, so let us show it graphically. In the following graph we have the average values of each variable with their std error bars.
+
+```{r}
+
+pormath_subset_nmr %>%
+  pivot_longer(cols = alc_use:famsup, names_to = "Attribute") %>%
+  group_by(high_use, sex, Attribute) %>%
+  summarise(Avg = mean(value), 
+            se = sd(value)/sqrt(length(value))) %>%
+  filter(Attribute != "alc_use") %>%
+  ggplot(aes(x = sex, y = Avg, fill = high_use)) +
+  geom_bar(position = position_dodge(), 
+           stat = "identity", 
+           alpha = 0.6) +
+  geom_errorbar(aes(x = sex, ymin = Avg-se, ymax = Avg+se),
+                position = position_dodge(width = 0.9),
+                width = 0.6,
+                alpha = 0.6)+
+  facet_wrap("Attribute", scales = "free") +
+  theme_classic()
+
+```
+As expected, **high_use** presents difference in means larger than standard error in **age** and **famrel** but mostly on male students. As well, **health** shows some difference in the means **famrel** but only on male students and less than the standard error.
+
+Now we look at box plots of each variable to confirm the data distribution.
+
+First, **age**:
+
+```{r}
+
+g1 <- pormath_subset_nmr %>%
+  ggplot(aes(x = high_use, y = age, fill = sex)) +
+  geom_boxplot(alpha = 0.4) +
+  facet_wrap("sex") +
+  theme_classic()
+
+g2 <- pormath_subset_nmr %>%
+  ggplot(aes(x = alc_use, y = age, group = alc_use, fill = sex)) +
+  geom_boxplot(alpha = 0.4) +
+  facet_wrap("sex") +
+  theme_classic()
+
+ggarrange(g1, g2, ncol = 1)
+
+```
+
+On male particularly, there seems to be an increase in **alc_use** as **age** increases.
+
+Then, **health**:
+
+```{r}
+
+g1 <- pormath_subset_nmr %>%
+  ggplot(aes(x = high_use, y = health, fill = sex)) +
+  geom_boxplot(alpha = 0.4) +
+  facet_wrap("sex") +
+  theme_classic()
+
+g2 <- pormath_subset_nmr %>%
+  ggplot(aes(x = alc_use, y = health, group = alc_use, fill = sex)) +
+  geom_boxplot(alpha = 0.4) +
+  facet_wrap("sex") +
+  theme_classic()
+
+ggarrange(g1, g2, ncol = 1)
+
+```
+
+No clear pattern is vissible.
+
+Now, **famrel**:
+
+```{r}
+
+g1 <- pormath_subset_nmr %>%
+  ggplot(aes(x = high_use, y = famrel, fill = sex)) +
+  geom_boxplot(alpha = 0.4) +
+  facet_wrap("sex") +
+  theme_classic()
+
+g2 <- pormath_subset_nmr %>%
+  ggplot(aes(x = alc_use, y = famrel, group = alc_use, fill = sex)) +
+  geom_boxplot(alpha = 0.4) +
+  facet_wrap("sex") +
+  theme_classic()
+
+ggarrange(g1, g2, ncol = 1)
+
+```
+
+I looks like students with **high_use** tend to have lower **famrel**.
+
+**famsup** is a bit tricky, since it is a factor variable. Therefore we will use frequency and mean plots instead of box plots.
+
+```{r}
+
+g1 <- pormath_subset_fct %>%
+  group_by(sex, famsup, high_use) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = famsup, y = count, fill = high_use )) +
+    geom_bar(position = "dodge",stat = "identity",alpha = 0.4) +
+    facet_wrap("sex") +
+    theme_classic()
+
+g2 <- pormath_subset_fct %>%
+  group_by(sex, famsup) %>%
+  summarise( se = sd(alc_use)/sqrt(length(alc_use)),
+             alc_use = mean(alc_use)) %>%
+  ggplot(aes(x = famsup, y = alc_use, fill = sex)) +
+  geom_bar(position = "dodge",stat = "identity",alpha = 0.4) +
+  geom_errorbar(aes(x = famsup, ymin = alc_use-se, ymax = alc_use+se),
+                position = position_dodge(width = 0.9),
+                width = 0.6,
+                alpha = 0.6) +
+  facet_wrap("sex") +
+  theme_classic()
+
+ggarrange(g1, g2, ncol = 1)
+
+```
+
+**alc_use** does not seem to significantly change based on the **famsup**.
+
+Lastly, I wanted to look at their average academic performance,which is depicted in the **G3** final grade (numeric: from 0 to 20, output target):
+
+```{r}
+
+g1 <- pormath %>%
+  ggplot(aes(x = high_use, y = G3, fill = sex)) +
+  geom_violin(width = 1, alpha = 0.5) +
+  geom_boxplot(position = position_dodge(width =1),
+               width = 0.1,
+               alpha = 0.2) +
+  facet_wrap("sex") +
+  theme_classic()
+
+g2 <- pormath %>%
+  ggplot(aes(x = alc_use, y = G3, group = alc_use, fill = sex)) +
+  geom_violin( width = 0.5, alpha = 0.5) +
+  geom_boxplot( width = 0.1, alpha = 0.2) +
+  facet_wrap("sex") +
+  theme_classic()
+
+ggarrange(g1, g2, ncol = 1)
+
+```
+
+While there is no significant change in the means, note how the variation in the **final grade** is much less as the **alc_use** and **high_use** increase. This means that the performance of those students that consume less alcohol has a wider distribution.
+
+But, let us focus on building our model. We start by including the four variables of interest into the logistic regression model and looking at the ANOVA presented by the *summary()* function.
+
+```{r}
+
+model1 <- glm(high_use ~ age + health + famrel + famsup, 
+              data = pormath_subset, 
+              family = "binomial")
+
+summary(model1)
+
+```
+
+**famsup** is a categorical variable, so the tests are performed a bit differently. Here, the  Wald test is performed to test whether the difference between the coefficient of the reference (*no*) and the level (*yes*) is different from zero. Therefore, we know that there is no significant difference between this levels. To confirm if the whole variable isn't significant, we remove the intercept.
+
+```{r}
+
+model2 <- glm(high_use ~ age + health + famrel + famsup - 1, 
+              data = pormath_subset, 
+              family = "binomial")
+
+summary(model2)
+
+```
+By removing the intercept, we are now testing if each coefficient of the categorical variable is different from zero. We see that the individual coefficients are now considered significant.
+
+To resolve this contradiction, we can create a third model that does not contain the variable **famsup** and compare it to our first model using a likelihood ratio test. This will tell us the probability of all coefficients from **famsup** being zero.
+
+```{r}
+
+model3 <- glm(high_use ~ age + health + famrel, 
+              data = pormath_subset, 
+              family = "binomial")
+
+summary(model3)
+
+anova(model1, model3, test = "LRT")
+
+```
+
+We see the high Pr(>Chi) tells us that the variable should not remain in the model.
+
+Now we can also see that **health** is not significant even though it is quite close. Therefore we will try removing it.
+
+```{r}
+
+model4 <- glm(high_use ~ age + famrel, 
+              data = pormath_subset, 
+              family = "binomial")
+
+summary(model4)
+
+```
+
+This caused the intercept to loose significance, but the remaining variables are marked as significant. Regardless, after running the predictive and cross-validation analysis, model 3 outperformed model 4. Therefore, I consider it to be the best available model with these variables.
+
+So regarding my hypothesis:
+
+ - **FALSE**  Even though **health** did not show a significant relationship with **high_use**, its inclusion in the model improved its performance.
+ - **PARTLY TRUE**  Only **famrel** and not **famsup** had an effect in alcohol consumption. 
+ - **TRUE**  **Age** had a significant effect over **high_use**.
+ 
+So let's look at the odds ratios with their CI's.
+
+```{r}
+
+model <- model3
+
+OR <- model %>% 
+  coef %>% 
+  exp
+
+CI <- model %>% 
+  confint %>% 
+  exp
+
+m_OR <- cbind(OR, CI)
+m_OR
+
+```
+
+What we can conclude from these coefficients is that:
+
+ - Higher **age** shows increased probability (1.24) of having **high_use**.
+ - (Not fully significant) Better health shows higher probability (1.17) of having **high_use**.
+ - Higher **fam_rel** shows decreased probability (0.72) of not having **high_use**.
+
+A 2X2 cross tabulation can give us a better idea of the predictive power of the model:
+
+```{r}
+
+probs <- predict(model, type = "response") # Predict probability responses based on the variables
+
+pormath_predict <- pormath_subset %>%
+  mutate(probability = probs) %>% # add them to our data.frame
+  mutate(prediction = probability > 0.5) # Compare those probabilities to our significance cutoff to identify the logical value
+
+# Plot the 2X2 cross tabulation of the predictions
+table(high_use = pormath_predict$high_use, 
+      prediction = pormath_predict$prediction) %>%
+  prop.table %>%
+  addmargins()
+
+```
+
+Around 70% of the values were predicted correctly. We can also see a graphical depiction:
+
+```{r}
+
+pormath_predict %>%
+  ggplot(aes(x = probability, y = high_use, col = prediction)) + 
+  geom_point() +
+  theme_classic()
+
+```
+
+We also can compute the total proportion of inaccurately classified individuals or training error by using the following function: 
+
+```{r}
+
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+```
+
+We can apply it to the data and compare its performance against a 10-fold cross-validation.
+
+```{r}
+
+te <- loss_func(class = pormath_predict$high_use, prob = pormath_predict$probability)
+
+cv <- pormath_predict %>%
+  cv.glm(cost = loss_func, glmfit = model, K = 10)
+
+cat(paste("Training error: ", te, "\n10-fold CV: ", cv$delta[1]))
+
+```
+
+Using the variables I selected, I could not make the model have a better performance than that of the DataCamp exercise.

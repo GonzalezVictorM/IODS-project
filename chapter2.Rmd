@@ -1,21 +1,14 @@
-# Data wrangling and analysis
-
-*Describe the work you have done this week and summarize your learning.*
-
-- Describe your work and results clearly. 
-- Assume the reader has an introductory course level understanding of writing and reading R code as well as statistical methods.
-- Assume the reader has no previous knowledge of your data or the more advanced methods you are using.
+## Chapter 2: Data wrangling and analysis
 
 ```{r}
 date()
-
 ```
 
 Here we go again...
 
 Remember! Set your working directory and load your libraries.
 
-```{r setup, message=FALSE}
+```{r setup1, message=FALSE}
 
 knitr::opts_knit$set(root.dir ="C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
 
@@ -24,7 +17,6 @@ library(ggplot2)
 library(GGally)
 library(hrbrthemes)
 library(janitor)
-
 
 ```
 
@@ -97,7 +89,7 @@ both_lt %>%
 
 ```
 
-This plot helps us confirm that there are no uneven densities in the different genders and learning typessupporting the normality of each variable. Still we can see outliers in the lower tail of **attitude** M, **deep** F, and **deep** M. We will keep this in mind when we move to the diagnostic plots. 
+This plot helps us confirm that there are no uneven densities in the different genders and learning types supporting the normality of each variable. Still we can see outliers in the lower tail of **attitude** M, **deep** F, and **deep** M. We will keep this in mind when we move to the diagnostic plots. 
 
 Lastly, we can look at the mean and standard deviation of the scores separated by gender in the form of a table. In the following table, you can notice the similarities between the genders. 
 
