@@ -186,7 +186,7 @@ pre code {
 <div id="chapter-1-about-the-project" class="section level2">
 <h2>Chapter 1: About the project</h2>
 <pre class="r"><code>date()</code></pre>
-<pre><code>## [1] &quot;Thu Nov 18 14:29:49 2021&quot;</code></pre>
+<pre><code>## [1] &quot;Thu Nov 18 14:41:44 2021&quot;</code></pre>
 <p>Well, I had never coded in my life before last <em>January</em>, so I am still a bit of a <strong>“noob”</strong> in these type of tasks. Regardless, I am a fast learner. I have been able to design some robust pipelines for data analysis, but I have maintained them locally. It is very exciting for me to start learning to use GitHub and all of its applications. The description of the course got me really excited since I am always copy/pasting code and referencing the source, and I think these abilities (those shown in the course) will enable me to be more agile in my coding.<br />
 Here is my forked repository:<br />
 <a href="https://github.com/GonzalezVictorM/IODS-project" class="uri">https://github.com/GonzalezVictorM/IODS-project</a> or <a href="https://github.com/GonzalezVictorM/IODS-project">here</a></p>
@@ -195,7 +195,7 @@ Here is my forked repository:<br />
 <div id="chapter-2-data-wrangling-and-analysis" class="section level2">
 <h2>Chapter 2: Data wrangling and analysis</h2>
 <pre class="r"><code>date()</code></pre>
-<pre><code>## [1] &quot;Thu Nov 18 14:29:49 2021&quot;</code></pre>
+<pre><code>## [1] &quot;Thu Nov 18 14:41:44 2021&quot;</code></pre>
 <p>Here we go again…</p>
 <p>Remember! Set your working directory and load your libraries.</p>
 <pre class="r"><code>knitr::opts_knit$set(root.dir =&quot;C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data&quot;)
@@ -426,7 +426,7 @@ plot(my_model2, which = c(1,2,5))</code></pre>
 <div id="chapter-3-logistic-regression" class="section level2">
 <h2>Chapter 3: Logistic Regression</h2>
 <pre class="r"><code>date()</code></pre>
-<pre><code>## [1] &quot;Thu Nov 18 14:30:00 2021&quot;</code></pre>
+<pre><code>## [1] &quot;Thu Nov 18 14:41:55 2021&quot;</code></pre>
 <p>Here we go again…</p>
 <p>Remember! Set your working directory and load your libraries.</p>
 <pre class="r"><code>knitr::opts_knit$set(root.dir =&quot;C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data&quot;)
@@ -907,12 +907,13 @@ table(high_use = pormath_predict$high_use,
 <p>We can apply it to the data and compare its performance against a 10-fold cross-validation.</p>
 <pre class="r"><code>te &lt;- loss_func(class = pormath_predict$high_use, prob = pormath_predict$probability)
 
+set.seed(1)
 cv &lt;- pormath_predict %&gt;%
   cv.glm(cost = loss_func, glmfit = model, K = 10)
 
 cat(paste(&quot;Training error: &quot;, te, &quot;\n10-fold CV: &quot;, cv$delta[1]))</code></pre>
 <pre><code>## Training error:  0.3 
-## 10-fold CV:  0.3</code></pre>
+## 10-fold CV:  0.308108108108108</code></pre>
 <p>Using the variables I selected, I could not make the model have a better performance than that of the DataCamp exercise.</p>
 <hr />
 </div>

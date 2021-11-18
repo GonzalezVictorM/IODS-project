@@ -421,6 +421,7 @@ We can apply it to the data and compare its performance against a 10-fold cross-
 
 te <- loss_func(class = pormath_predict$high_use, prob = pormath_predict$probability)
 
+set.seed(1)
 cv <- pormath_predict %>%
   cv.glm(cost = loss_func, glmfit = model, K = 10)
 
