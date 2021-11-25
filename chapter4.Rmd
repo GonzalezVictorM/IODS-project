@@ -1,0 +1,372 @@
+## Chapter 4: Clustering and classification
+
+```{r}
+date()
+```
+
+Here we go again...
+
+Remember! Set your working directory and load your libraries.
+
+```{r setup4, message=FALSE}
+
+knitr::opts_knit$set(root.dir ="C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
+
+library(tidyverse)
+library(ggplot2)
+library(MASS)
+library(corrplot)
+library(GGally)
+library(car)
+
+```
+
+We read the data.
+
+```{r}
+
+data("Boston")
+
+```
+
+"Housing Values in Suburbs of Boston" is a data set native to the MASS package in R. The data set includes various indicators for the different Boston suburbs. Further explanation on the variables can be found [here](https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/Boston.html).
+
+We first explore the dimensions and structure.
+
+```{r}
+
+dim(Boston)
+
+str(Boston)
+
+```
+
+The data set contains mostly numeric variables with the exception of **rad** (index of accessibility to radial highways) and **chas** (Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)). They are a ranked factor and a logical variable respectively. Therefore we convert them and look at the results.
+
+**Note:** Because of rad increased number of factor levels, we will keep as integer.
+
+```{r}
+
+Boston <- Boston %>%
+  mutate(chas = as.logical(chas))
+
+summary(Boston)
+
+```
+
+The past table provides a lot on information on quartile distribution of our variables, but I always rather look at the variables with boxplots or barplots:
+
+```{r}
+
+Boston %>%
+  pivot_longer(cols = c(1:14), names_to = "Attribute", values_to = "Value") %>%
+  filter(!Attribute %in% c("chas","rad")) %>%
+  ggplot(aes(x = Attribute, y = Value)) +
+  geom_boxplot() +
+  facet_wrap("Attribute", scales = "free") +
+  theme_classic()
+
+Boston %>%
+  pivot_longer(cols = c(1:14), names_to = "Attribute", values_to = "Value") %>%
+  filter(Attribute %in% c("chas","rad")) %>%
+  ggplot(aes(x = Value)) +
+  geom_histogram() +
+  facet_wrap("Attribute", scales = "free") +
+  theme_classic()
+
+```
+
+We can conclude:
+
+ - 93% of towns do not have boundaries to the Charles River.
+ - Below 10 index of accessibility to radial highways, there seems to be a normal distribution that is disrupted by those with 24 index.
+ - 3rd quartile of cities only present up to 3.67 crimes per capita.
+ - Only the 1st quartile is under 375 of black population (see calculation [here](https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/Boston.html)).
+
+Additionally, we can look at the normality of the non-factorial distributions using the qqPlot.
+
+```{r}
+
+colnames(Boston)[-c(4,9)] %>% sapply(function(x){
+  qqPlot(Boston[,x], main = x)
+})
+
+```
+
+The paired statistics and scatter plots of the variables are also useful to start looking at the data.
+
+```{r}
+
+Boston %>%
+  ggpairs(mapping = aes(alpha = 0.3), 
+          lower = list(combo = wrap("facethist", bins = 20)),
+          upper = list(continuous = wrap("cor", size = 1.5)))
+
+```
+
+From here we can see that:
+
+ - **Crime** presents correlation above 0.3 with all variables except for **zn** (proportion of residential land zoned for lots over 25,000 sq.ft), rm (average number of rooms per dwelling), and **ptratio** (pupil-teacher ratio by town).
+ - **Crime** shows a positive relation with **indus** (proportion of non-retail business acres per town), **nox** (nitrogen oxides concentration (parts per 10 million)), **age** (proportion of owner-occupied units built prior to 1940), **rad**, **tax** (full-value property-tax rate per \$10,000), and **lstat** (lower status of the population (percent)).
+ - **Crime** shows a negative relation with **dis** (weighted mean of distances to five Boston employment centres), **black**, and **medv** (median value of owner-occupied homes in \$1000s).
+
+Another way of looking at this values is a correlation plot (corrplot or ggcorr):
+
+```{r}
+
+data("Boston")
+
+cor_mat <- cor(Boston) %>% round(digits = 2)
+
+corrplot(cor_mat, method = "circle", type = "upper", cl.pos = "b", tl.pos = "d", tl.cex = 0.6)
+
+ggcorr(Boston, geom = "circle", method = c("everything", "pearson"))
+
+```
+
+These show the same information as the *ggpairs* plot.
+
+due to the different dimensions of each variable, it is hard to compute the influence of eac one and compare them reliably. Therefore, we present a summary of the scaled variables.
+
+```{r}
+
+boston_scaled <- Boston %>%
+  scale %>%
+  as.data.frame
+
+summary(boston_scaled)
+
+```
+
+Now we can compare between them and say that **crime** presents the biggest range of scaled data and we can start analyzing the scaled effects of each variable over the **crime rate**.
+
+First we separate the **crime** variable in quartiles and assign the *low*, *med-low*, *med-high*, and *high* labels to each quartile.
+
+```{r}
+
+bins <- quantile(boston_scaled$crim) # binning in quartiles
+
+crime <- boston_scaled$crim %>%
+  cut(breaks = bins, 
+      include.lowest = TRUE, 
+      labels = c("low", "med_low", "med_high", "high"))
+
+```
+
+We now substitute the numeric **crime** variable for the binned quartiles.
+
+```{r}
+
+boston_qt <- boston_scaled %>% 
+  mutate(crim = crime)
+
+```
+
+Once we have the factor variable, it is time to generate our training and testing data sets. Our training data set will be used to generate an explanatory model for our target variable **crime**. The model will be applied to the test data to predict the outcome. Note that the sampling is random, so each iteration of this testing might give slightly different models.
+
+```{r}
+
+set.seed(123) # to maintain random variables
+
+n <- nrow(boston_qt)
+
+ind <- sample(n,  size = n * 0.8)
+
+train <- boston_qt[ind,]
+
+test <- boston_qt[-ind,]
+
+```
+
+Save and remove the **crime** levels from the testing data.
+
+```{r}
+
+correct_classes <- test$crim
+
+test <- dplyr::select(test, -crim)
+
+```
+
+And now we are ready to do our linear discriminant analysis (LDA). LDA is a classification method used for the modelling of categorical variables. Let's remember that this model assumes normality of the variables and that is why we do the scaling first. Additionally, variables should be continuous, but for this exercise we can ignore **chas**.
+
+```{r}
+
+lda.fit <- lda(crim ~ ., data = train)
+
+lda.fit
+
+```
+
+The prior probabilities tell us the distribution of probability of falling into either of the groups. The coefficients of linear discriminants by variable give us the the coefficient of each linear discriminant that maximize the ratio of the between-group variance to its within-group variance. Lastly, the proportion of trace is the amount of the between-group variance that is explained by each corresponding linear discriminant (eg. LD1 explains 96% of the between-group variance).
+
+The following code takes the coefficients to draw arrows representing the size of the effect of the scaled valuable over the model and applies it to the plot below as arrows.
+
+```{r}
+
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "orange", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+```
+
+We change the **crime** variable in our training data set to a numeric vector.
+
+```{r}
+
+classes <- as.numeric(train$crim)
+
+```
+
+We plot  the LDA fitted model (LD1 vs LD2) and separate each class using colors and figures. We also run the function to draw the arrows.
+
+```{r}
+
+plot(lda.fit, dimen = 2, col = classes, pch = classes)
+lda.arrows(lda.fit, myscale = 1)
+
+```
+
+We can observe that **rad** has the biggest influence over the separation of the model. Furthermore, its influence is mostly explained by the LD1. This means that the changes in the rad variable are more likely to influence the **crime rate** into a *high* value.
+
+Now we can test the predictive power of this model over the test data set and create a table to compare the results with those stored in *correct_classes*.
+
+```{r}
+
+lda.pred <- predict(lda.fit, newdata = test)
+table(correct = correct_classes, predicted = lda.pred$class)
+
+```
+
+We can now apply the same loss function we used before to asses the proportion of wrong predictions.
+
+```{r}
+
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+loss_func(as.numeric(correct_classes),as.numeric(lda.pred$class))
+
+```
+
+We can see the 34% of the predictions were not correct.
+
+For the next part of the analysis, we will observe the different ways of comparing the similarity of the different towns. We will use both euclidean and Manhattan distances. Euclidean is simple the geometric distance between two points, while Manhattan distance observes the absolute differences between the coordinates of two points.
+
+First we measure the euclidean distance:
+
+```{r}
+
+data("Boston")
+
+boston_scaled <- Boston %>%
+  scale %>%
+  as.data.frame
+
+dist_eu <- dist(boston_scaled)
+summary(dist_eu)
+
+```
+
+and the Manhattan distance as well:
+
+```{r}
+
+dist_man <- dist(boston_scaled, method = 'manhattan')
+summary(dist_man)
+
+```
+
+These two distance are applied to clustering protocols by minimizing the distance between the observatoions.
+
+One example of such clustering protocols is the k-means clustering. Note that, contrary to the LDA classification method, the clustering is an unsupervised method that does not have the final classification determined *a priori*. Also remember that the distance measuring method will change the output of your clustering.
+
+So now we run the k-means clustering method on the scaled data starting by three centroids.
+
+```{r}
+
+km <- kmeans(boston_scaled, centers = 3)
+
+pairs(boston_scaled, col = km$cluster)
+
+```
+
+In the plot we can observe how the distribution into the clusters separates the data in the pairwise scatter plots. But this was just a guessed number of centroids. We can optimize this by using the within cluster sum of squares (WCSS).
+
+We will run the k-means clustering method changing th number of clusters from 1 to 10. We will take the WCSS (i.e. variance between the obs in a cluster and the center of that cluster) and compare it as the number of centers increases. 
+
+so first we run all the different k in 1:10, and store the total WCSS (TWCSS)
+
+```{r}
+
+set.seed(123) # to maintain the result of random variables.
+k_max <- 10
+twcss <- sapply(1:k_max, function(k){kmeans(Boston, k)$tot.withinss})
+
+```
+
+Now we plot the TWCSS's vs the number of centers.
+
+```{r}
+
+qplot(x = 1:k_max, y = twcss, geom = 'line')
+
+```
+
+We can see that the biggest change occurs between 1 and 2 centers. We will try now the clustering with two centers.
+
+```{r}
+
+km <- kmeans(Boston, centers = 2)
+pairs(Boston, col = km$cluster)
+
+```
+
+As we observe the scatter plots we can appreciate that the groups ar better defined then when using 3 centers. Therefore, 2 centers is our optimal k for our clustering analysis.
+
+For the bonus points: LDA on k-means
+
+```{r}
+
+data("Boston")
+
+boston_scaled <- Boston %>%
+  scale %>%
+  as.data.frame
+
+set.seed(123) # to maintain random variables
+
+km <- kmeans(boston_scaled, centers = 3)
+
+boston_km <- boston_scaled %>% 
+  mutate(crim = as.factor(km$cluster))
+
+n <- nrow(boston_km)
+
+ind <- sample(n,  size = n * 0.8)
+
+train <- boston_km[ind,]
+
+test <- boston_km[-ind,]
+
+correct_classes <- test$crim
+
+test <- dplyr::select(test, -crim)
+
+lda.fit <- lda(crim ~ ., data = train)
+
+classes <- as.numeric(train$crim)
+
+plot(lda.fit, dimen = 2, col = classes, pch = classes)
+lda.arrows(lda.fit, myscale = 1)
+
+```
+
+We can observe that **rad** remains the biggest influence over the separation of the model. Furthermore, its influence is mostly explained by the LD1 again. This means that the changes in the **rad** variable are more likely to influence the **crime rate** into a *1* cluster. Then **age** seems to have the next most influential value. **Age** seems to mostly separate cluster 2 and 3 in the LD2 axis.
