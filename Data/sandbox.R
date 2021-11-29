@@ -3,25 +3,7 @@ setwd("C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScien
 rm(list=ls())
 par(mfrow = c(1,1))
 
-install.packages("car")
-library(car)
-
-
-qqPlot(Boston$indus)
-
-colnames(Boston)[-c(4,9)] %>% sapply(function(x){
-  qqPlot(Boston[,x], main = x)
-})
-
-
-
-
-
-
-
-
-
-## Cycle to test 10 random variable 
+## Cycle to test 10 random variable with logistic model
 
 deltas <- matrix(nrow = 10,ncol=2)
 deltas[,1] <- c(1:10)
@@ -47,3 +29,41 @@ for (i in 1:10) {
 }
 
 plot(deltas[,1], deltas[,2], type = "l")
+
+
+## Human sandbox
+
+setwd("C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
+
+rm(list=ls())
+library(tidyverse)
+
+human <- read.csv("human_base.csv", header = T, sep = ",")
+
+human$GNI <- human$GNI %>%
+  gsub(",","", x = .) %>%
+  as.numeric
+
+keep <- c("Country", "Edu2.FM", "Labo.FM", "Edu.Exp", "Life.Exp",
+          "GNI", "Mat.Mor", "Ado.Birth", "Parli.F")
+
+human <- human %>%
+  select(one_of(keep))
+
+data.frame(human, comp = complete.cases(human))
+
+human_ <- human %>% 
+  filter(complete.cases(human))
+
+tail(human_, 10)
+
+last <- nrow(human_) - 7
+
+human_ <- human_[1:last, ]
+
+rownames(human_) <- human_$Country
+
+human <- human_[,-1]
+
+human %>% write.csv("human.csv", row.names = F)
+

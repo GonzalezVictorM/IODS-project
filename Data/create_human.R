@@ -21,6 +21,7 @@
 setwd("C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
 
 rm(list=ls())
+library(tidyverse)
 
 # Read the data
 
@@ -42,12 +43,12 @@ summary(gii)
 # Whenever you change variable names, always keep a table that relates them.
 
 hdcols <- colnames(hd) %>%
-  cbind(c("HDIrank","Country","hdi","LEaB","EYoE","MYoE","GNIpC","GNIminusHDIrank")) %>%
+  cbind(c("HDI.rank","Country","HDI","Life.Exp","Edu.Exp","Edu.Mean","GNI","GNI.Minus.Rank")) %>%
   as.data.frame()
 colnames(hdcols) <- c("Old","New")
 
 giicols <- colnames(gii) %>%
-  cbind(c("GIIrank","Country","gii","MMR","ABR","PRiP","edu2F","edu2M","labF","labM")) %>%
+  cbind(c("GII.rank","Country","GII","Mat.Mor","Ado.Birth","Parli.F","Edu2.F","Edu2.M","Labo.F","Labo.M")) %>%
   as.data.frame(col.names = c("Original", "New"))              
 colnames(giicols) <- c("Old","New")
 
@@ -59,11 +60,11 @@ colnames(gii) <- giicols$New
 # Calculate the secondary education and labour force participation ration  
 
 gii <- gii %>%
-  mutate(edu2Ratio = edu2F/edu2M, labRatio = labF/labM)
+  mutate(Edu2.FM = Edu2.F/Edu2.M, Labo.FM = Labo.F/Labo.M)
 
 # Join the data keeping only countries in both tables.
 
 human <- inner_join(hd, gii, by = "Country")
 
 # Create the file.
-human %>% write.csv("human.csv", row.names = F)
+human %>% write.csv("human_base.csv", row.names = F)
