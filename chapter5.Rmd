@@ -1,51 +1,41 @@
-setwd("C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
+## Chapter 5: Dimensionality reduction techniques
 
-rm(list=ls())
-par(mfrow = c(1,1))
+```{r}
+date()
+```
 
-## Cycle to test 10 random variable with logistic model
+Here we go again...
 
-deltas <- matrix(nrow = 10,ncol=2)
-deltas[,1] <- c(1:10)
+Remember! Set your working directory and load your libraries.
 
-randomvars <- colnames(pormath)[-49] %>%
-  sample(size = 10)
+```{r setup5, message=FALSE}
 
-for (i in 1:10) {
-  
-  factors <- randomvars[1:i] %>%
-    paste0(collapse = " + ")
-  
-  design <- paste0("high_use ~ ", factors) %>%
-    as.formula
-  
-  model <- glm(design, data = pormath, family = "binomial")
-  
-  cv <- pormath %>%
-    cv.glm(cost = loss_func, glmfit = model, K = 10)
-  
-  deltas[i,2] <- cv$delta[1]
-  
-}
+knitr::opts_knit$set(root.dir ="C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
 
-plot(deltas[,1], deltas[,2], type = "l")
-
-
-## Human sandbox
-
-setwd("C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
-
-rm(list=ls())
 library(tidyverse)
 library(car)
 library(GGally)
 library(FactoMineR)
 
+```
+
+We read the data.
+
+```{r}
+
 human <- read.csv("human_base.csv", header = T, sep = ",")
+
+```
+
+```{r}
 
 human$GNI <- human$GNI %>%
   gsub(",","", x = .) %>%
   as.numeric
+
+```
+
+```{r}
 
 keep <- c("Country", "Edu2.FM", "Labo.FM", "Edu.Exp", "Life.Exp",
           "GNI", "Mat.Mor", "Ado.Birth", "Parli.F")
@@ -53,10 +43,12 @@ keep <- c("Country", "Edu2.FM", "Labo.FM", "Edu.Exp", "Life.Exp",
 human <- human %>%
   select(one_of(keep))
 
-data.frame(human, comp = complete.cases(human))
-
 human_ <- human %>% 
   filter(complete.cases(human))
+
+```
+
+```{r}
 
 tail(human_, 10)
 
@@ -68,15 +60,19 @@ rownames(human_) <- human_$Country
 
 human <- human_[,-1]
 
-human %>% write.csv("human.csv", row.names = T)
+```
 
-human <- read.csv("human.csv", header = T, sep = ",", row.names = 1)
+```{r}
 
 dim(human)
 
 str(human)
 
 summary(human)
+
+```
+
+```{r}
 
 human %>% rownames_to_column(var = "Country") %>%
   pivot_longer(cols = c(-1), names_to = "Attribute", values_to = "Value") %>%
@@ -85,9 +81,17 @@ human %>% rownames_to_column(var = "Country") %>%
   facet_wrap("Attribute", scales = "free", nrow = 2) +
   theme_classic()
 
+```
+
+```{r}
+
 colnames(human) %>% sapply(function(x){
   qqPlot(human[,x], main = x)
 })
+
+```
+
+```{r}
 
 human %>%
   ggpairs(mapping = aes(alpha = 0.3))
@@ -95,15 +99,26 @@ human %>%
 human %>%
   ggcorr(method = c("everything", "pearson"))
 
+```
+
+```{r}
 
 pca_human <- prcomp(human)
 
 s <- summary(pca_human)
 s
 
+```
+
+```{r,fig.height=15, fig.width=15}
+
 pca_pr <- round(100*s$importance[2,], digits = 2) 
 
 biplot(pca_human, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
+
+```
+
+```{r}
 
 human_std <- scale(human)
 
@@ -112,10 +127,17 @@ pca_human <- prcomp(human_std)
 s <- summary(pca_human)
 s
 
+```
+
+```{r,fig.height=15, fig.width=15}
+
 pca_pr <- round(100*s$importance[2,], digits = 2) 
 
 biplot(pca_human, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
 
+```
+
+```{r}
 
 data(tea)
 
@@ -125,6 +147,10 @@ str(tea)
 
 summary(tea)
 
+```
+
+```{r, fig.height=15, fig.width=10}
+
 tea %>%
   select(-age) %>%
   pivot_longer(cols = c(-sex), names_to = "Attribute", values_to = "Value") %>%
@@ -133,6 +159,9 @@ tea %>%
   geom_bar(position = "dodge",alpha = 0.4) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
 
+```
+
+```{r}
 
 mca <- tea %>%
   select(-age) %>% 
@@ -140,21 +169,10 @@ mca <- tea %>%
 
 summary(mca)
 
+```
+
+```{r, fig.height=15, fig.width=15}
+
 plot(mca, invisible=c("ind"), habillage = "quali")
 
-
-keep_columns <- c("Tea", "How", "how", "sugar", "where", "lunch")
-
-tea_time <- select(tea, one_of(keep_columns))
-
-summary(tea_time)
-str(tea_time)
-
-mca <- MCA(tea_time, graph = FALSE)
-
-# summary of the model
-summary(mca)
-
-# visualize MCA
-plot(mca, invisible=c("ind"), habillage = "quali")
-
+```
