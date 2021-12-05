@@ -27,6 +27,14 @@ human <- read.csv("human_base.csv", header = T, sep = ",")
 
 ```
 
+The Human Development Index (HDI) is a summary measure of average achievement of a country in human development such as a long and healthy life with a decent standard of living. The HDI is the geometric mean of normalized indices that represent theHuman Development separated into three categories. The Gender Inequality Index (GII) reflects gender-based disadvantage based on reproductive health, empowerment and the labor market. GII is shown together with HDI to show the difference in human development between genders due to inequality between female and male achievements. The following data sets consolidate the HDI and GII indicators (17) for 195 countries. For more information on the topic, visit the following links: 
+
+<http://hdr.undp.org/sites/default/files/hdr2015_technical_notes.pdf>  
+
+<http://hdr.undp.org/en/content/human-development-index-hdi>
+
+First we re-format the **GNI** to contain numbers intead of char.
+
 ```{r}
 
 human$GNI <- human$GNI %>%
@@ -35,18 +43,22 @@ human$GNI <- human$GNI %>%
 
 ```
 
+We select the variables of interest for our study and remove those country that are missing any of the indexes (i.e. NA's).
+
 ```{r}
 
 keep <- c("Country", "Edu2.FM", "Labo.FM", "Edu.Exp", "Life.Exp",
           "GNI", "Mat.Mor", "Ado.Birth", "Parli.F")
 
 human <- human %>%
-  select(one_of(keep))
+  dplyr::select(one_of(keep))
 
 human_ <- human %>% 
   filter(complete.cases(human))
 
 ```
+
+Looking at the tail of the table, we can notice that the last seven observations are regions instead of countries. Therefore, we remove them as we change the country names into the row names.
 
 ```{r}
 
@@ -62,6 +74,8 @@ human <- human_[,-1]
 
 ```
 
+Now we can take a look at the data. With 155 countries remaining,we will be studying the interactions of 8 continuous variables of int or num type.
+
 ```{r}
 
 dim(human)
@@ -71,6 +85,8 @@ str(human)
 summary(human)
 
 ```
+
+As in the last chapter, it is hard to compare the range of the variables or their means and std deviations without first scaling, so lets look at them graphically first.
 
 ```{r}
 
@@ -83,6 +99,10 @@ human %>% rownames_to_column(var = "Country") %>%
 
 ```
 
+Most of the variables seem to show normal distributions according to the box plots. They mostly lack outliers and the median is close to the center of the range. **Maternal mortality** and **GNI** do not show this characteristics. First of all **GNI** has a range at least 3 orders of magnitude bigger than any other variable. also, both of these variables show a concentrated 3 quartiles in the lower par of their range and outliers the go way higher.
+
+Let us use the qqplots to confirm the Normaility of these distributions.
+
 ```{r}
 
 colnames(human) %>% sapply(function(x){
@@ -90,6 +110,10 @@ colnames(human) %>% sapply(function(x){
 })
 
 ```
+
+As expected from the box plots, **GNI** and **maternal mortality** diverge from the identity line in our qqplots making their normality questionable.
+
+To continue our analysis, we will look at the correlation coefficients. For correlation comparison, scaling is not considered necesary. Therefore, let us see the situation when the values are not scaled.
 
 ```{r}
 
@@ -101,6 +125,15 @@ human %>%
 
 ```
 
+From here we can see:
+
+ - **Maternal mortality** and **life expectancy** show the highest correlation which happens to be negative. This makes sense, since the lack of health development would clearly be reflected by low healthcare availability or quality, and, thus, higher mortality rates and lower **life expectancy**.
+ - **Expected education** and **life expectancy** show the next highest correlation, but positive this time. 
+
+We could keep discussing the correlation between variables, but due to the high complexity of the model due to the amount of variables we might reach unclear conclusions. Therefore, we will use a dimensionality reduction technique. Principal component analysis or PCA lets us focus in the main dimensions that provide the explanation for most of the variation in the data points. PCA starts by defining a dimension in which the distance between the points is maximized. This will be our first principal component since it accounts for most of the variation. From then on, the algorithm continues looking for the dimensions that maximize the remaing distances. The catch is that starting on the second principal component, this dimension must be orthogonal to the last one. For further details on PCA watch this [video](https://www.youtube.com/watch?v=FgakZw6K1QQ) which I love.
+
+So lets go at it. Note that I have not scaled the values yet.
+
 ```{r}
 
 pca_human <- prcomp(human)
@@ -110,6 +143,10 @@ s
 
 ```
 
+From the summary table you can notice that PC1 accounts for 99.99% of the variance. With this result, we *know* that this dimension explains all of the variance so **Hurray!**.
+
+Wait, there is a catch. Let us look at the graphical representation of the first 2 PCs in a biplot compared to the size of each variables influence (the size will be represented by pink arrows that show the projection of each variables axix unto the 2-D plain created between PC1 and PC2).
+
 ```{r,fig.height=15, fig.width=15}
 
 pca_pr <- round(100*s$importance[2,], digits = 2) 
@@ -117,6 +154,10 @@ pca_pr <- round(100*s$importance[2,], digits = 2)
 biplot(pca_human, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
 
 ```
+
+Just as expected, the lack of scaling is causing problems. As discussed **GNI** is over 3 orders of magnitude bigger than any other variable and, thus, any variation in that variable will cause the PCA to be centered on that dimension. That is why the projection of the **GNI** dimension is so prominent: PC1 is almost parallel to it.
+
+Since PCA works by maximizing variance, we have to scale the variables for the analysis to be worthwhile.So here we go with the scaled data.
 
 ```{r}
 
@@ -129,6 +170,8 @@ s
 
 ```
 
+Much better, now we can see how the distribution of the variation is spread between the different PCs. But let us look at PC1 and PC2 since they account for almost 70% of the variation.
+
 ```{r,fig.height=15, fig.width=15}
 
 pca_pr <- round(100*s$importance[2,], digits = 2) 
@@ -136,6 +179,16 @@ pca_pr <- round(100*s$importance[2,], digits = 2)
 biplot(pca_human, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
 
 ```
+
+Now we can see that:
+
+ - **Maternal mortality** and **adolescent birth rates** do show a close relationship as their projections over the 2 first PCs are very similar. additionally, they are almost parallel to PC1 and almost opposed to **life expectancy**. Furthermore, we can observe that countries in the furthermost right section of the plot belong mostly to the African continent.
+ - On the top left corner we can se the Nordics. According to the size projections of the variables,these countries would have the highest **GNI**, **expected education**, **life expectancy**, **female over male secondary education ratio**, **female in parliament**, and **female over male secondary education ratio**.
+ 
+Since it is not my are of expertise I would rather not make very insightful observations, but there does seem to be a relation between the developed countries and their human development versus developing countries.
+
+For data sets with categorical data, the MCA is a good alternative to the PCA.
+Here we call for the **tea** data set from the **Factominer** package.
 
 ```{r}
 
@@ -149,10 +202,14 @@ summary(tea)
 
 ```
 
+The data used here comes from a questionnaire about tea consumption. 300 individuals were interviewed about how they drink tea (18 questions), what are their product's perception (12 questions) and some personal details (4 questions). 
+
+Due to them being categorical variables, lets just look at the bar plots to see the distributions.
+
 ```{r, fig.height=15, fig.width=10}
 
 tea %>%
-  select(-age) %>%
+  dplyr::select(-age) %>%
   pivot_longer(cols = c(-sex), names_to = "Attribute", values_to = "Value") %>%
   ggplot(aes(Value, fill = sex)) +
   facet_wrap("Attribute", scales = "free") +
@@ -161,18 +218,52 @@ tea %>%
 
 ```
 
+We can see that:
+
+ - For most variables, **gender** does not seem to affect the tea preferences of the interviewed.
+ 
+Again, all of this variables can seem very overwhelming, but the MCA can simplify things. But even before that, let us select the variables involved in how they drink coffee.
+
 ```{r}
 
-mca <- tea %>%
-  select(-age) %>% 
+keep_columns <- c("Tea", "How", "how", "sugar", "where", "lunch")
+
+tea <- dplyr::select(tea, one_of(keep_columns))
+
+```
+
+MCA uses frequencies instead of geometrical distances to calculate the patterns between categorical variables. It uses multi-dimentional cross tabulations of the data, There are various methods for this, like an indicator matrix or the Burt matrix. Their main idea is to separate the categorical variables into their categories and align them to the observation.
+
+Using the inter- and intra-category variances, the algorythm will generate new dimensions that explain the most variance possible. Let's try it.
+
+```{r}
+
+mca <- tea %>% 
   MCA(graph = FALSE)
 
 summary(mca)
 
 ```
 
+We can conclude that:
+
+ - Dim1 and Dim2 only account for 11% of the variance.
+ - Even in the top 10 individuals, the contibution to the variance is not very high.
+ - In the categories, we can look at the v.test to confirm that all absolute values above 1.96 are significantly different to 0.
+ - In the categories, the squared correlation with the variable and the dimension tells us if there is a srong relationship of the variable explaining the variance.
+ 
+It is much easier to interpret by looking at the graphical depiction of this analysis.
+
 ```{r, fig.height=15, fig.width=15}
 
-plot(mca, invisible=c("ind"), habillage = "quali")
+plot(mca, invisible=c("ind"), habillage = "quali", graph.type = "classic")
 
 ```
+
+Note that this is the categories plot. It will tell us which categories are closely related to each other. We can therefore concluded:
+
+ - Those buying tea bags mostly get them from chain stores, while unpacked tea drinkers usually get them from tea stores.Lastly, groups without preference for tea bags or unpacked also show no preference for buying location.
+ - Not lunch tea drinlkers most likely have a preference on the place and type of tea to buy then noty tea drinkers.
+ - Earl grey drinkers are more likely to drink tea with milk and sugar then black tea drinkers who are closer to lemon and alone tea.
+
+With this exercise we could explore how the categories are distributed. Remember that these dimensions only account for 11% of the variance. Therefore, always try to explore at least some of the next dimensions (this also applies to PCA).
