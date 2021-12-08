@@ -1,50 +1,41 @@
-setwd("C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
+## Chapter 6: Analysis of longitudinal data
 
-rm(list=ls())
-par(mfrow = c(1,1))
+```{r}
+date()
+```
 
-## Cycle to test 10 random variable with logistic model
+Here we go again...
 
-deltas <- matrix(nrow = 10,ncol=2)
-deltas[,1] <- c(1:10)
+Remember! Set your working directory and load your libraries.
 
-randomvars <- colnames(pormath)[-49] %>%
-  sample(size = 10)
+```{r setup, message=FALSE}
 
-for (i in 1:10) {
-  
-  factors <- randomvars[1:i] %>%
-    paste0(collapse = " + ")
-  
-  design <- paste0("high_use ~ ", factors) %>%
-    as.formula
-  
-  model <- glm(design, data = pormath, family = "binomial")
-  
-  cv <- pormath %>%
-    cv.glm(cost = loss_func, glmfit = model, K = 10)
-  
-  deltas[i,2] <- cv$delta[1]
-  
-}
+knitr::opts_knit$set(root.dir ="C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
 
-plot(deltas[,1], deltas[,2], type = "l")
-
-
-## rats and pbrs sandbox
-
-library(lme4)
-library(dplyr)
+library(ggpubr)
+library(tidyverse)
 library(ggplot2)
+library(lme4)
+
+```
+
+We read the data.
+
+```{r}
 
 rats <- read.csv("rats_long.csv") %>%
-  mutate(across(c(ID, Group), factor))
+   mutate(across(c(ID, Group), factor))
 
-bprs <- read.csv("bprs_long.csv") %>%
-  mutate(across(c(treatment, subject), factor))
+```
+
+```{r}
 
 str(rats)
 summary(rats)
+
+```
+
+```{r}
 
 rats %>%
   ggplot(aes(x = Time, y = Weight, group = ID)) +
@@ -53,6 +44,10 @@ rats %>%
   scale_y_continuous(name = "Weight (grams)") +
   ggtitle("Rat's weight over time") +
   theme_bw()
+
+```
+
+```{r}
 
 rats <- rats %>%
   group_by(Time) %>%
@@ -66,6 +61,10 @@ rats %>%
   scale_y_continuous(name = "Weight (grams)") +
   ggtitle("Rat's weight over time") +
   theme_bw()
+
+```
+
+```{r}
 
 ratsTS <- rats %>%
   group_by(Group, Time) %>%
@@ -81,7 +80,11 @@ ratsTS %>%
   geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width=0.5) +
   scale_y_continuous(name = "mean(bprs) +/- se(bprs)") +
   theme_bw()
-  
+
+```
+
+```{r}
+
 ratsGS <- rats %>%
   filter(Time > 1) %>%
   group_by(Group, ID) %>%
@@ -97,6 +100,10 @@ ratsGS %>%
   scale_y_continuous(name = "mean(Weight), days 1 to 64") +
   theme_bw()
 
+```
+
+```{r}
+
 ratsGS1 <- ratsGS %>%
   filter((Group == 1 & mean > 250) | (Group == 2 & mean < 550) | (Group == 3 & mean > 500))
 
@@ -111,6 +118,10 @@ ratsGS1 %>%
   stat_summary(fun = "mean", geom = "point", shape=23, size=2, fill = "red") +
   scale_y_continuous(name = "mean(Weight), days 1 to 64") +
   theme_bw()
+
+```
+
+```{r}
 
 ratsnoO <- rats %>%
   filter(!(ID %in% outlierIDs))
@@ -130,14 +141,22 @@ ratsTS1 %>%
   scale_y_continuous(name = "mean(bprs) +/- se(bprs)") +
   theme_bw()
 
+```
+
+```{r}
+
 groups <- c(3,2,1)
 stats <- sapply(groups, function(g){
   test <- t.test(mean ~ Group, data = filter(ratsGS, Group != g), var.equal = TRUE)
   return(c(test$p.val, unlist(test$conf.int))) 
 })
-colnames(stats) <- c("G 1 and 2", "G 1 and 3", "G 2 and 3")
+colnames(stats) <- c("G 1 and 2:", "G 1 and 3:", "G 2 and 3:")
 rownames(stats) <- c("pval", "conf_int_low", "conf_int_high")
-stats
+t(stats)
+
+```
+
+```{r}
 
 baseline <- rats %>% 
   filter(Time == 1) %>%
@@ -150,10 +169,24 @@ fit <- lm(mean ~ baseline + Group, data = ratsGS2)
 
 anova(fit)
 
+```
+
+```{r}
+
+bprs <- read.csv("bprs_long.csv") %>%
+  mutate(across(c(treatment, subject), factor))
+
+```
+
+```{r}
 
 str(bprs)
 summary(bprs)
 
+```
+
+```{r}
+
 bprs %>%
   ggplot(aes(x = week, y = BPRS)) +
   geom_line(aes(linetype = subject)) +
@@ -162,43 +195,76 @@ bprs %>%
   theme_bw() +
   theme(legend.position = "none")
 
-bprs_reg <- lm(BPRS ~ week + treatment, data = bprs)
+```
 
+```{r}
+
+bprs_reg <- lm(BPRS ~ week + treatment, data = bprs)
 summary(bprs_reg)
 
-bprs_ref <- lmer(BPRS ~ week + treatment + (1 | subject), data = bprs, REML = F)
+```
 
+```{r}
+
+bprs_ref <- lmer(BPRS ~ week + treatment + (1 | subject), data = bprs, REML = F)
 summary(bprs_ref)
 
-bprs_ref1 <- lmer(BPRS ~ week + treatment + (week | subject), data = bprs, REML = F)
+```
 
+```{r}
+
+bprs_ref1 <- lmer(BPRS ~ week + treatment + (week | subject), data = bprs, REML = F)
 summary(bprs_ref1)
+
+```
+
+```{r}
 
 anova(bprs_ref1,bprs_ref)
 
-bprs_ref2 <- lmer(BPRS ~ week * treatment + (week | subject), data = bprs, REML = F)
+```
 
+```{r}
+
+bprs_ref2 <- lmer(BPRS ~ week * treatment + (week | subject), data = bprs, REML = F)
 summary(bprs_ref2)
+
+```
+
+```{r}
 
 anova(bprs_ref2, bprs_ref1)
 
-bprs %>%
+```
+
+```{r}
+
+g1 <- bprs %>%
   ggplot(aes(x = week, y = BPRS)) +
   geom_line(aes(linetype = subject)) +
   scale_linetype_manual(values = rep(1:10, times=4)) +
   facet_wrap("treatment", labeller = label_both) +
   theme_bw() +
   theme(legend.position = "none")
+g1
+
+```
+
+```{r, fig.height=15, fig.width=10}
 
 Fitted <- fitted(bprs_ref2)
 
 bprs <- bprs %>%
   mutate(Fitted)
 
-bprs %>%
+g2 <- bprs %>%
   ggplot(aes(x = week, y = Fitted)) +
   geom_line(aes(linetype = subject)) +
   scale_linetype_manual(values = rep(1:10, times=4)) +
   facet_wrap("treatment", labeller = label_both) +
   theme_bw() +
   theme(legend.position = "none")
+
+ggarrange(g1, g2, ncol = 1)
+
+```
