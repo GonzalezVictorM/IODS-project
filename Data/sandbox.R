@@ -36,6 +36,7 @@ plot(deltas[,1], deltas[,2], type = "l")
 library(lme4)
 library(dplyr)
 library(ggplot2)
+library(broom)
 
 rats <- read.csv("rats_long.csv") %>%
   mutate(across(c(ID, Group), factor))
@@ -81,7 +82,22 @@ ratsTS %>%
   geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width=0.5) +
   scale_y_continuous(name = "mean(bprs) +/- se(bprs)") +
   theme_bw()
-  
+
+rats_RegS  <- rats %>% 
+  group_by(Group, ID) %>% 
+  do(regTimeCoeff = tidy(lm(Weight ~ Time, data = .))$estimate[2]) %>%
+  mutate(regTimeCoeff = unlist(regTimeCoeff))
+
+glimpse(rats_RegS)
+
+rats_RegS %>%
+  ggplot(aes(x = Group, y = regTimeCoeff)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=2, fill = "red") +
+  scale_y_continuous(name = "mean(Weight), days 1 to 64") +
+  theme_bw()
+
+
 ratsGS <- rats %>%
   filter(Time > 1) %>%
   group_by(Group, ID) %>%

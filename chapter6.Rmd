@@ -8,7 +8,7 @@ Here we go again...
 
 Remember! Set your working directory and load your libraries.
 
-```{r setup, message=FALSE}
+```{r setup6, message=FALSE}
 
 knitr::opts_knit$set(root.dir ="C:/Users/ramosgon/OneDrive - University of Helsinki/Courses/OpenDataScience/IODS-project/Data")
 
@@ -16,10 +16,15 @@ library(ggpubr)
 library(tidyverse)
 library(ggplot2)
 library(lme4)
+library(broom)
 
 ```
 
-We read the data.
+### Rats Data
+
+The following data is taken from Crowder and Hand (1990). The effect of three diets divided by **groups** over the **weight** of mice was studied over 9 **weeks**. A measurement at time point 0 was made and then measurements were taken weekly, except for **week** 7 when an extra measurement was taken.
+
+First, we read the data.
 
 ```{r}
 
@@ -28,12 +33,18 @@ rats <- read.csv("rats_long.csv") %>%
 
 ```
 
+And observe its stucture and summarized values.
+
 ```{r}
 
 str(rats)
 summary(rats)
 
 ```
+
+We can see we have the long version of the data that has previously been wrangled. An **ID** factor with 16 levels tells us there were a total of 16 subjects that were **weighed** 11 times each. we can also see that diet for **group** 1 was given to double the amount of mice than the separate other two diets. Time seems to be expressed in days instead of weeks. Lastly, the **weight** of the mice ranges in over 400 grams. Since these measurments have been repeated over the same subjects over an extended period of time, we can label this as longitudinal data.
+
+A great way to start looking at longitudinal data is to plot it directly in a scatter plot of the response, in this case **weight** vs **time**. We will also differentiate the plotted lines belonging to each of the  three **groups**.
 
 ```{r}
 
@@ -46,6 +57,8 @@ rats %>%
   theme_bw()
 
 ```
+
+We can observe that mice with higher **weight** at the beginning of te study, remain like that through out the study. The same can be said about those with lower **weight**. Let us try to observe this *tracking* phenomenon in more detail by standardizing the **weight** of the mice by **time** of the measurement.
 
 ```{r}
 
@@ -63,6 +76,8 @@ rats %>%
   theme_bw()
 
 ```
+
+Though it still seems a bit cryptic, the plot shows us a flatter pattern of the **weigh** measurements, confirming that the trend is there. This is still a complex way to look at the data though. When working with large number of subjects, it is better to look at the average profiles of each of our **groups** of interest. Let us take the average by **time point** and **group** and plot them with their standard error (Note that the se calculation was changed to reflect the non equal number of subjects in each **group** by simply calling for the *n()* functrion).
 
 ```{r}
 
@@ -83,71 +98,80 @@ ratsTS %>%
 
 ```
 
-```{r}
+From here we can conclude:
 
-ratsGS <- rats %>%
-  filter(Time > 1) %>%
-  group_by(Group, ID) %>%
-  summarise(mean = mean(Weight)) %>%
-  ungroup()
+ - The variability in the subjects of **group** 2 is the highest.
+ - **Group** 1 seems to have the lowest **weight**, but their starting **weight** is also the lowest, so further analysis is needed.
 
-glimpse(ratsGS)
-
-ratsGS %>%
-  ggplot(aes(x = Group, y = mean)) +
-  geom_boxplot() +
-  stat_summary(fun = "mean", geom = "point", shape=23, size=2, fill = "red") +
-  scale_y_continuous(name = "mean(Weight), days 1 to 64") +
-  theme_bw()
-
-```
+If the measurements are equally temporally inter-spaced, we can easily look at a boxplor of each **time**. Let us remember that it is not the case for this data (week 7), but let us take a look at it.
 
 ```{r}
 
-ratsGS1 <- ratsGS %>%
-  filter((Group == 1 & mean > 250) | (Group == 2 & mean < 550) | (Group == 3 & mean > 500))
-
-outlierIDs <- ratsGS %>%
-  mutate(outlier = !((Group == 1 & mean > 250) | (Group == 2 & mean < 550) | (Group == 3 & mean > 500))) %>%
-  filter(outlier) %>%
-  .$ID
-
-ratsGS1 %>%
-  ggplot(aes(x = Group, y = mean)) +
-  geom_boxplot() +
-  stat_summary(fun = "mean", geom = "point", shape=23, size=2, fill = "red") +
-  scale_y_continuous(name = "mean(Weight), days 1 to 64") +
-  theme_bw()
-
-```
-
-```{r}
-
-ratsnoO <- rats %>%
-  filter(!(ID %in% outlierIDs))
-
-ratsTS1 <- ratsnoO %>%
-  group_by(Group, Time) %>%
-  summarise(mean = mean(Weight), se = sd(Weight)/sqrt(n())) %>%
-  ungroup()
-
-glimpse(ratsTS1)
-
-ratsTS1 %>%
-  ggplot(aes(x = Time, y = mean, col = Group, shape = Group)) +
-  geom_line() +
-  geom_point(size = 3) +
-  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width=0.5) +
+rats %>%
+  mutate(across(c(Time), factor)) %>%
+  ggplot(aes(x = Time, y = Weight, fill = Group)) +
+  geom_boxplot(alpha = 0.3) +
   scale_y_continuous(name = "mean(bprs) +/- se(bprs)") +
   theme_bw()
 
 ```
 
+Here we can observe that all three **groups** seem to have outliers. But let us consider this more carefully once we have performed a summary measure analysis.
+
+Since we want to find out if the rate of change in **weight** of the mice is the same for every diet, we choose the regression coefficient as a summary measurement. We first calculate the regression coefficient for each **ID** mice. Then, the resulting data is then summarized in a box plot.
+
+```{r}
+
+rats_RegS  <- rats %>% 
+  group_by(Group, ID) %>% 
+  do(regTimeCoeff = tidy(lm(Weight ~ Time, data = .))$estimate[2]) %>%
+  mutate(regTimeCoeff = unlist(regTimeCoeff))
+
+glimpse(rats_RegS)
+
+rats_RegS %>%
+  ggplot(aes(x = Group, y = regTimeCoeff)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=2, fill = "red") +
+  scale_y_continuous(name = "Time estimate coefficient in Lm(weight ~ time)") +
+  theme_bw()
+
+```
+
+We can conclude:
+
+ - The variability in the subjects of **group** 2 is the highest.
+ - **Group** 1 seems to have the lowest **weight** change and **group** 2 the highest.
+ - **Group** 1 seems to have one outlier.
+
+To avoid bias, let us try this again by removing the outliers and storing their **ID's** in a variable.
+
+```{r}
+
+rats_RegS1 <- rats_RegS %>%
+  filter(regTimeCoeff>0.25)
+
+outlierIDs <- which(rats_RegS$regTimeCoeff < 0.25) %>%
+  rats_RegS$ID[.]
+
+rats_RegS1 %>%
+  ggplot(aes(x = Group, y = regTimeCoeff)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=2, fill = "red") +
+  scale_y_continuous(name = "Time estimate coefficient in Lm(weight ~ time)") +
+  theme_bw()
+
+```
+
+When we have removed the outlier, it is harder to assert if there is a significant difference between group 1 and 3
+
+We still need a formal confirmation if the **coefficient** differs between **group** 1 and 2 or 3. We can use a T test between the different **groups**, but er then risk on multiple testing error. Let us just look at the values regardless.
+
 ```{r}
 
 groups <- c(3,2,1)
 stats <- sapply(groups, function(g){
-  test <- t.test(mean ~ Group, data = filter(ratsGS, Group != g), var.equal = TRUE)
+  test <- t.test(regTimeCoeff ~ Group, data = filter(rats_RegS, Group != g), var.equal = TRUE)
   return(c(test$p.val, unlist(test$conf.int))) 
 })
 colnames(stats) <- c("G 1 and 2:", "G 1 and 3:", "G 2 and 3:")
@@ -156,20 +180,36 @@ t(stats)
 
 ```
 
+We can conclude:
+
+ - The lowest p-val is between **group** 1 and 2, which are the most separated in our box plot.
+ - **Group** 1 and 3 are still statistically significantly different (p-val<0.05), but not as much.
+ - **Group** 2 and 3 are not statistically different.
+ 
+Note that multiple testing can incur in errors as mentioned in Chapter 2. Therefore, the linear regression model provides a more accurate description of the relationships. Let us fit a model and look at the results with the *summary()* and *anova()* functions.
+
+
 ```{r}
 
-baseline <- rats %>% 
-  filter(Time == 1) %>%
-  .$Weight
+fit <- lm(regTimeCoeff ~ Group, data = rats_RegS)
 
-ratsGS2 <- ratsGS %>%
-  mutate(baseline = baseline)
-
-fit <- lm(mean ~ baseline + Group, data = ratsGS2)
+summary(fit)
 
 anova(fit)
 
 ```
+
+With this initial exploratory analysis of the data we can conclude:
+
+ - There is a statistically significant difference between the change in **weight** in **Group** 1 and 2.
+ - There is a statistically significant difference between the change in **weight** in **Group** 1 and 3.
+ - The difference between the change in **weight** in **Group** 2 and 3 is no statistically significant.
+
+### BPRS data
+
+The following data is taken from Davis (2002). In the data, 40 male **subjects** were rated on the brief psychiatric rating scale or **BPRS** after being treated with one of two **treatments**. A measurement at time point 0 was made and then measurements were taken every **week** for 8 weeks. For more information on the **BPRS** go to this [link](https://www.webmd.com/schizophrenia/what-is-bprs).
+
+First, we read the data.
 
 ```{r}
 
@@ -178,12 +218,18 @@ bprs <- read.csv("bprs_long.csv") %>%
 
 ```
 
+And observe its stucture and summarized values.
+
 ```{r}
 
 str(bprs)
 summary(bprs)
 
 ```
+
+We can see we have the long version of the data that has previously been wrangled. A **subject** factor with 20 levels tells us there were a total of 40 subjects that were scored in **BPRS** 9 times each. we can also see that both **treatments** have the same amount of patients. Time is expressed in weeks. Since these measurments have been repeated over the same subjects over an extended period of time, we can label this as longitudinal data.
+
+A great way to start looking at longitudinal data is to plot it directly in a line plot of the response, in this case **BPRS** vs **week**. We will also differentiate the plotted lines belonging to each of the **treatments**.
 
 ```{r}
 
@@ -197,12 +243,20 @@ bprs %>%
 
 ```
 
+At this point, we can notice that there seems to be a tendency in all of the **subjects** to get lower **BPRS** over time and become less variable. Regardless, it is hard to conclude anything from such a complex data.
+
+If we look at the data set in its long form, it is easy to visualize it can be studied with a multiple linear regression model. Here we ignore that the readings come from the same **subject**. Let us fit the data to a linear regression model.
+
 ```{r}
 
 bprs_reg <- lm(BPRS ~ week + treatment, data = bprs)
 summary(bprs_reg)
 
 ```
+
+We can clearly see that the second **treatment** is not statistically different than first one by looking at the p-val above 0.05. Additionally, the model only explains 18.5 % of the variation in the **BPRS** measurements. Regardless, this model assumes the independence of the measurements and, therefore, is incorrect. To overcome this issue, we will use linear mixed models.
+
+First, we can fit the data to a random intercept model with **week** and **treatment** as the variables affecting **BPRS**. This regression adds the random effect corresponding to the unobserved variables when calculating the model by allowing for each **subject's** intercept to be different.
 
 ```{r}
 
@@ -211,6 +265,10 @@ summary(bprs_ref)
 
 ```
 
+We can see that the random effect variance of the subjects is low compared to the residual variance. This means that there is not a lot of variation between the intercept of the fitted regressions of each **subject**. Furthermore, the regression estimates for the fixed effect are identical to the regular linear model, and both the intercept and **week** estimates are significant, but not the **treatment** 2. This supports that the **treatments** have no different effect on the **BPRS**. 
+
+Now it is time to calculate the random intercept and random slope model. This model allows for both the slope and intercept to vary between the **subjects**. This change allow us to take into consideration not only the starting point but also the  rate of change in **BPRS** of the individual **subjects** together with time. So let us calculate it.
+
 ```{r}
 
 bprs_ref1 <- lmer(BPRS ~ week + treatment + (week | subject), data = bprs, REML = F)
@@ -218,26 +276,33 @@ summary(bprs_ref1)
 
 ```
 
+The regression estimates for the fixed effect are identical to the regular linear model and the random intercept model, and both the intercept and **week** estimates are significant, but not the **treatment** 2. This supports that the **treatments** have no different effect on the **BPRS**. 
+
+W can use the *anova()* to compare our two random models. 
+
 ```{r}
 
 anova(bprs_ref1,bprs_ref)
 
 ```
 
+The p-val of the chi squared in the anova shows a significant value, which confirms the random slope and intercept model fits our data better.
+
+Lastly, let us run our random slope and intercept model but now allowing for **treatment** X **week** to see if it affects the **BPRS**. We immediately compare it with the previous model.
+
 ```{r}
 
 bprs_ref2 <- lmer(BPRS ~ week * treatment + (week | subject), data = bprs, REML = F)
 summary(bprs_ref2)
-
-```
-
-```{r}
-
 anova(bprs_ref2, bprs_ref1)
 
 ```
 
-```{r}
+At this point, the Chi squared p-val is not significant. this shows that the interaction model is not better, further supporting that there are no significantly different rates of change in the **BPRS** between the different  **treatments**.
+
+Now, let us compare the original data and the fitted values by the random intercept and random slop regression.
+
+```{r, fig.height=15, fig.width=10}
 
 g1 <- bprs %>%
   ggplot(aes(x = week, y = BPRS)) +
@@ -246,13 +311,8 @@ g1 <- bprs %>%
   facet_wrap("treatment", labeller = label_both) +
   theme_bw() +
   theme(legend.position = "none")
-g1
 
-```
-
-```{r, fig.height=15, fig.width=10}
-
-Fitted <- fitted(bprs_ref2)
+Fitted <- fitted(bprs_ref1)
 
 bprs <- bprs %>%
   mutate(Fitted)
@@ -268,3 +328,5 @@ g2 <- bprs %>%
 ggarrange(g1, g2, ncol = 1)
 
 ```
+
+The plot shows very clearly that there is no discernible pattern to differentiate one treatment from another.
